@@ -1,0 +1,71 @@
+project:
+  name: "ナーススケジューリング最適化"
+  description: "Pulpライブラリを使用したナースシフトスケジューリング問題の解決"
+
+requirements:
+  python_version: ">=3.8"
+  dependencies:
+    - pulp>=2.7.0
+    - pandas>=1.3.0
+    - numpy>=1.20.0
+
+problem_definition:
+  nurses:
+    total_count: 10
+    shift_types:
+      - name: "日勤"
+        description: "通常の日勤シフト"
+      - name: "夜勤"
+        description: "夜間シフト"
+      - name: "夜勤明"
+        description: "夜勤の翌日のシフト"
+      - name: "早出"
+        description: "早朝からのシフト"
+      - name: "遅出"
+        description: "遅い時間からのシフト"
+  
+  constraints:
+    daily_shifts:
+      weekday:
+        day_shift: 6
+        night_shift: 1
+      weekend:
+        day_shift: 2
+        night_shift: 1
+    
+    monthly_limits:
+      max_working_days: 20
+      total_days_in_month: 31
+    
+    shift_rules:
+      - rule: "夜勤の翌日は必ず夜勤明"
+        description: "夜勤シフトの後は必ず夜勤明シフトを割り当てる"
+      - rule: "1日1シフト"
+        description: "1人のナースは1日に1つのシフトのみ割り当て可能"
+
+implementation_steps:
+  1_data_preparation:
+    - create_nurse_list
+    - create_shift_types
+    - create_calendar_data
+    - define_constraints
+  
+  2_model_creation:
+    - initialize_pulp_problem
+    - create_decision_variables
+    - add_objective_function
+    - add_constraints
+  
+  3_solution:
+    - solve_optimization_problem
+    - extract_solution
+    - validate_solution
+  
+  4_output:
+    - create_schedule_dataframe
+    - export_to_excel
+    - generate_summary_statistics
+
+output_format:
+  - excel_schedule
+  - summary_report 
