@@ -1,5 +1,7 @@
 from pulp import *
 import calendar
+import csv
+from datetime import datetime
 
 # 問題の定義
 prob = LpProblem("NurseScheduling", LpMinimize)
@@ -70,16 +72,28 @@ prob.solve()
 
 # 結果の出力
 if LpStatus[prob.status] == 'Optimal' or LpStatus[prob.status] == 'Infeasible':
-    print("シフトスケジュール:")
+    # CSVファイル名の生成（現在の日時を含む）
+    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_filename = f"nurse_schedule_{current_time}.csv"
     
-    # カレンダー形式で出力
-    for d in dates:
-        print(f"\n{d}日目 ({'休日' if is_weekend(d) else '平日'}):")
-        for s in SHIFTS:
-            nurses = [NURSE_NAMES[n] for n in range(NUM_NURSES) if value(x[n, d, s]) == 1]
-            if nurses:
-                print(f"{s}: {', '.join(nurses)}")
+    # CSVファイルに書き込み
+    with open(csv_filename, 'w', newline='', encoding='utf-8-sig') as csvfile:
+        writer = csv.writer(csvfile)
+        
+        # ヘッダー行の書き込み
+        writer.writerow(['日付', '曜日', 'シフト', '担当者'])
+        
+        # シフトデータの書き込み
+        for d in dates:
+            day_type = '休日' if is_weekend(d) else '平日'
+            for s in SHIFTS:
+                nurses = [NURSE_NAMES[n] for n in range(NUM_NURSES) if value(x[n, d, s]) == 1]
+                if nurses:
+                    writer.writerow([d, day_type, s, ', '.join(nurses)])
     
+    print(f"\nシフトスケジュールを {csv_filename} に出力しました。")
+    
+    # 勤務統計の出力
     print("\n勤務統計:")
     for n in range(NUM_NURSES):
         total_days = sum(value(x[n, d, s]) for d in dates for s in SHIFTS)
