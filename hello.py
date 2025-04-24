@@ -1,108 +1,103 @@
 from pulp import *
+import datetime
 import calendar
 import csv
-from datetime import datetime
+from collections import defaultdict
+
+# 定数の定義
+NURSES = 10  # ナースの人数
+DAYS = 30    # 1月の日数
+SHIFTS = ['日勤', '夜勤']  # 夜勤明けはシフトとして扱わない
 
 # 問題の定義
-prob = LpProblem("NurseScheduling", LpMinimize)
-
-# パラメータの設定
-NUM_NURSES = 10
-SHIFTS = ['日勤', '夜勤', '夜勤明']  # シフトを3種類に制限
-DAYS_IN_MONTH = 31
-MAX_WORKING_DAYS = 20
-
-# ナースの名前設定
-NURSE_NAMES = {
-    0: "佐藤 美咲",
-    1: "鈴木 愛",
-    2: "高橋 優子",
-    3: "田中 真理",
-    4: "渡辺 京子",
-    5: "伊藤 陽子",
-    6: "山本 恵美",
-    7: "中村 直美",
-    8: "小林 真由美",
-    9: "加藤 美穂"
-}
-
-# 日付の設定
-dates = range(1, DAYS_IN_MONTH + 1)
-
-# 曜日の判定関数
-def is_weekend(day):
-    return day % 7 == 6 or day % 7 == 0  # 土日の場合
+prob = LpProblem("Nurse_Scheduling", LpMinimize)
 
 # 変数の定義
+# x[n][d][s] = 1 if nurse n works shift s on day d, 0 otherwise
 x = LpVariable.dicts("shift",
-                    ((n, d, s) for n in range(NUM_NURSES) 
-                               for d in dates 
-                               for s in SHIFTS),
-                    cat='Binary')
+                     ((n, d, s) for n in range(NURSES) 
+                      for d in range(DAYS) 
+                      for s in SHIFTS),
+                     cat='Binary')
 
-# 目的関数: シフトの公平性を最大化
-prob += 0  # 目的関数を最小化（制約条件のみを考慮）
+# 目的関数（最小化したい変数がない場合は0を設定）
+prob += 0
 
 # 制約条件
-# 1. 1日1シフトの制約
-for n in range(NUM_NURSES):
-    for d in dates:
+# 1. 各ナースは1日に1つのシフトのみ
+for n in range(NURSES):
+    for d in range(DAYS):
         prob += lpSum(x[n, d, s] for s in SHIFTS) <= 1
 
-# 2. 月間シフト数の上限
-for n in range(NUM_NURSES):
-    prob += lpSum(x[n, d, s] for d in dates for s in SHIFTS) <= MAX_WORKING_DAYS
+# 2. 平日のシフト制約（月～金）
+for d in range(DAYS):
+    weekday = (d + 1) % 7  # 1月1日が水曜日の場合の調整
+    if weekday < 6:  # 月～金
+        prob += lpSum(x[n, d, '日勤'] for n in range(NURSES)) == 6
+        prob += lpSum(x[n, d, '夜勤'] for n in range(NURSES)) == 1
 
-# 3. 各シフトの必要人数
-for d in dates:
-    if is_weekend(d):  # 休日
-        prob += lpSum(x[n, d, '日勤'] for n in range(NUM_NURSES)) == 2
-        prob += lpSum(x[n, d, '夜勤'] for n in range(NUM_NURSES)) == 1
-    else:  # 平日
-        prob += lpSum(x[n, d, '日勤'] for n in range(NUM_NURSES)) == 6
-        prob += lpSum(x[n, d, '夜勤'] for n in range(NUM_NURSES)) == 1
+# 3. 休日のシフト制約（土日）
+for d in range(DAYS):
+    weekday = (d + 1) % 7
+    if weekday >= 6:  # 土日
+        prob += lpSum(x[n, d, '日勤'] for n in range(NURSES)) == 2
+        prob += lpSum(x[n, d, '夜勤'] for n in range(NURSES)) == 1
 
-# 4. 夜勤の次の日は夜勤明
-for n in range(NUM_NURSES):
-    for d in range(1, DAYS_IN_MONTH):
-        prob += x[n, d, '夜勤'] <= x[n, d+1, '夜勤明']
+# 4. 夜勤の次の日は必ず休み（夜勤明け）
+for n in range(NURSES):
+    for d in range(DAYS-1):
+        prob += x[n, d, '夜勤'] + lpSum(x[n, d+1, s] for s in SHIFTS) <= 1
 
-# 5. 夜勤明けの看護師は日勤不可
-for n in range(NUM_NURSES):
-    for d in range(1, DAYS_IN_MONTH):
-        prob += x[n, d, '夜勤明'] + x[n, d, '日勤'] <= 1
+# 5. 1人あたりの月間勤務日数上限
+for n in range(NURSES):
+    prob += lpSum(x[n, d, s] for d in range(DAYS) for s in SHIFTS) <= 20
 
-# 問題の求解
+# 問題を解く
 prob.solve()
 
 # 結果の出力
-if LpStatus[prob.status] == 'Optimal' or LpStatus[prob.status] == 'Infeasible':
-    # CSVファイル名の生成（現在の日時を含む）
-    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_filename = f"nurse_schedule_{current_time}.csv"
+if LpStatus[prob.status] == 'Optimal':
+    # 勤務統計の計算
+    stats = defaultdict(lambda: defaultdict(int))
     
-    # CSVファイルに書き込み
-    with open(csv_filename, 'w', newline='', encoding='utf-8-sig') as csvfile:
-        writer = csv.writer(csvfile)
+    # 結果をCSVファイルに出力
+    with open('nurse_schedule.csv', 'w', encoding='utf-8-sig', newline='') as f:
+        writer = csv.writer(f)
+        # ヘッダー行
+        header = ['日付', '曜日'] + [f'看護師{i+1}' for i in range(NURSES)]
+        writer.writerow(header)
         
-        # ヘッダー行の書き込み
-        writer.writerow(['日付', '曜日', 'シフト', '担当者'])
+        # データ行
+        weekdays = ['月', '火', '水', '木', '金', '土', '日']
+        for d in range(DAYS):
+            weekday = weekdays[(d + 1) % 7]  # 1月1日が水曜日の場合の調整
+            row = [f'2025-01-{d+1:02d}', weekday]
+            for n in range(NURSES):
+                shift = ''
+                for s in SHIFTS:
+                    if value(x[n, d, s]) == 1:
+                        shift = s
+                        stats[n][s] += 1
+                        break
+                # 前日に夜勤だった場合は夜勤明けと表示
+                if d > 0 and value(x[n, d-1, '夜勤']) == 1 and shift == '':
+                    shift = '夜勤明け'
+                row.append(shift)
+            writer.writerow(row)
         
-        # シフトデータの書き込み
-        for d in dates:
-            day_type = '休日' if is_weekend(d) else '平日'
-            for s in SHIFTS:
-                nurses = [NURSE_NAMES[n] for n in range(NUM_NURSES) if value(x[n, d, s]) == 1]
-                if nurses:
-                    writer.writerow([d, day_type, s, ', '.join(nurses)])
+        # 統計情報の追加
+        writer.writerow([])  # 空行
+        writer.writerow(['勤務統計'])
+        writer.writerow(['看護師', '日勤回数', '夜勤回数', '合計勤務日数'])
+        for n in range(NURSES):
+            total = sum(stats[n].values())
+            writer.writerow([
+                f'看護師{n+1}',
+                stats[n]['日勤'],
+                stats[n]['夜勤'],
+                total
+            ])
     
-    print(f"\nシフトスケジュールを {csv_filename} に出力しました。")
-    
-    # 勤務統計の出力
-    print("\n勤務統計:")
-    for n in range(NUM_NURSES):
-        total_days = sum(value(x[n, d, s]) for d in dates for s in SHIFTS)
-        weekend_days = sum(value(x[n, d, s]) for d in dates for s in SHIFTS if is_weekend(d))
-        print(f"{NURSE_NAMES[n]}: 総勤務日数={total_days}, 休日勤務={weekend_days}")
+    print("スケジュールが正常に生成され、nurse_schedule.csvに保存されました。")
 else:
-    print(f"シフトが見つかりませんでした。ステータス: {LpStatus[prob.status]}") 
+    print("最適解が見つかりませんでした。")
