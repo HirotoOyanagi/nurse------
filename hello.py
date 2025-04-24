@@ -6,7 +6,7 @@ from collections import defaultdict
 
 # 定数の定義
 NURSES = 10  # ナースの人数
-DAYS = 30    # 1月の日数
+DAYS = 31    # 1月の日数
 SHIFTS = ['日勤', '夜勤']  # 夜勤明けはシフトとして扱わない
 
 # 問題の定義
@@ -32,14 +32,14 @@ for n in range(NURSES):
 # 2. 平日のシフト制約（月～金）
 for d in range(DAYS):
     weekday = (d + 1) % 7  # 1月1日が水曜日の場合の調整
-    if weekday < 6:  # 月～金
+    if weekday < 5:  # 月～金
         prob += lpSum(x[n, d, '日勤'] for n in range(NURSES)) == 6
         prob += lpSum(x[n, d, '夜勤'] for n in range(NURSES)) == 1
 
 # 3. 休日のシフト制約（土日）
 for d in range(DAYS):
     weekday = (d + 1) % 7
-    if weekday >= 6:  # 土日
+    if weekday >= 5:  # 土日
         prob += lpSum(x[n, d, '日勤'] for n in range(NURSES)) == 2
         prob += lpSum(x[n, d, '夜勤'] for n in range(NURSES)) == 1
 
