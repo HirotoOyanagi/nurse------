@@ -67,6 +67,11 @@ for n in range(NUM_NURSES):
     for d in range(1, DAYS_IN_MONTH):
         prob += x[n, d, '夜勤'] <= x[n, d+1, '夜勤明']
 
+# 5. 夜勤明けの看護師は日勤不可
+for n in range(NUM_NURSES):
+    for d in range(1, DAYS_IN_MONTH):
+        prob += x[n, d, '夜勤明'] + x[n, d, '日勤'] <= 1
+
 # 問題の求解
 prob.solve()
 
