@@ -74,7 +74,7 @@ def calculate_cost(solution):
         required_shifts = REQUIRED_SHIFTS_WEEKEND if is_weekend(day) else REQUIRED_SHIFTS_WEEKDAY
 
         for shift_type, required_count in required_shifts.items():
-            cost += abs(daily_shifts[shift_type] - required_count) * 10 # 違反が大きいほどペナルティも大きく
+            cost += abs(daily_shifts[shift_type] - required_count) * 50 # 違反が大きいほどペナルティも大きく
 
     # 2. シフト間の連続制約
     for nurse_id in range(NUM_NURSES):
@@ -97,14 +97,9 @@ def calculate_cost(solution):
             if solution[nurse_id][day] not in ['休み', '夜勤明']: # 休みと夜勤明は勤務日数にカウントしない
                 work_days += 1
         if work_days > MAX_WORK_DAYS:
-            cost += (work_days - MAX_WORK_DAYS) * 5 # 超過日数に応じてペナルティ
+            cost += (work_days - MAX_WORK_DAYS) * 20 # 超過日数に応じてペナルティ
 
-    # 4. 夜勤明け後の勤務禁止 (夜勤明けの次の日は勤務に入らないようにする)
-    # これは問題文には明示されていないが、現実的な制約として追加
-    for nurse_id in range(NUM_NURSES):
-        for day in range(DAYS_IN_MONTH - 1):
-            if solution[nurse_id][day] == '夜勤明' and solution[nurse_id][day+1] not in ['休み']:
-                cost += 10 # 夜勤明けの次の日に勤務している場合にペナルティ
+   
 
     return cost
 
