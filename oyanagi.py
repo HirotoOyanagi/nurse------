@@ -199,6 +199,30 @@ def save_schedule_to_csv(schedule, filename="nurse_schedule.csv"):
     except Exception as e:
         print(f"\nCSVファイルの保存中にエラーが発生しました: {e}")
 
+def fix_consecutive_night_shift_off(schedule):
+    """
+    夜勤明けが同じ人で二回連続になった場合、2回目の夜勤明けを休みに変更する
+    """
+    modified_count = 0
+    
+    for nurse_id in range(NUM_NURSES):
+        for day in range(DAYS_IN_MONTH - 1):
+            current_shift = schedule[nurse_id][day]
+            next_shift = schedule[nurse_id][day + 1]
+            
+            # 夜勤明けが2日連続の場合
+            if current_shift == '夜勤明' and next_shift == '夜勤明':
+                schedule[nurse_id][day + 1] = '休み'
+                modified_count += 1
+                print(f"  N{nurse_id + 1}の{day + 2}日目: 夜勤明 → 休み に変更")
+    
+    if modified_count > 0:
+        print(f"\n夜勤明け連続の修正を{modified_count}箇所実施しました。")
+    else:
+        print("\n夜勤明け連続は検出されませんでした。")
+    
+    return schedule
+
 if __name__ == "__main__":
     # 焼きなまし法のパラメータ
     initial_temp = 2000.0  # 初期温度 (高めに設定)
@@ -216,6 +240,10 @@ if __name__ == "__main__":
         print("残念ながら、すべての制約を満たす解は見つかりませんでした。")
         print("ただし、これが現在の探索における最適な近似解です。")
         print("コストの内訳を分析し、制約の緩和やパラメータ調整を検討してください。")
+
+    # 夜勤明け連続の修正処理
+    print("\n--- 夜勤明け連続チェック・修正 ---")
+    final_schedule_jp = fix_consecutive_night_shift_off(final_schedule_jp)
 
     print_schedule(final_schedule_jp)
     save_schedule_to_csv(final_schedule_jp, "nurse_schedule.csv")
